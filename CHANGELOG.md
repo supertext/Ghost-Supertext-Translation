@@ -20,6 +20,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - New setting `STATE_FILE` for this state (what was reported, the latest key check); the demo keeps it in its volume.
 - New setting `SUPERTEXT_LANGUAGE_MAP` (`de=de-CH,zh=zh-Hans`): which Supertext language each configured language is sent as.
 - **Language mapping on the status page**: one drop-down list per language (the source language first) with Supertext's languages as *Name (code)*, preselected with the saved choice, else the default (`de` → `de-DE`), else *— choose —*. Ghost Owners and Administrators save it (protected by the Ghost staff session and a CSRF token; only Supertext's codes are accepted); it applies without a restart and is kept in `supertext-settings.json` next to `STATE_FILE` (new setting `SUPERTEXT_SETTINGS_FILE`). `SUPERTEXT_LANGUAGE_MAP` stays as an override for automated setups: the languages it names are shown read-only. Existing `SUPERTEXT_LANGUAGE_MAP` values keep working unchanged.
+- Support: the Supertext support form is linked in the README, the user guide and GitHub's "New issue" page.
 
 ### Changed
 

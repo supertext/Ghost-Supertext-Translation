@@ -123,3 +123,7 @@ The status page follows your browser's language (English, German, French or Ital
 | Failed: "… translation limit is exceeded" | Your Supertext subscription is used up. | Tell your administrator. |
 | Failed: "Interrupted by a restart" | The server restarted while translating. | Remove the tag, then add it again. |
 | "… text part(s) came back empty" | A few pieces stayed in the original language. | Translate those pieces by hand in the draft. |
+
+## Support
+
+Questions, problems or ideas: use the [Supertext support form](https://integrations.supertext.com/en/support?platform=ghost). Mention the version of Ghost and of the plugin, what you did and what you expected; an error message helps a lot. You get an answer by email, in your language.
