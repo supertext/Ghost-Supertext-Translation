@@ -252,6 +252,35 @@ npm run docs:screenshots               # BASE_URL, RESOLVE_TO, DEMO_* variables 
 
 The script signs in as the editor, adds `#translate-de-ch`, captures the tag picker, posts list, status page, German draft, edits the draft and requests again (the *Not overwritten* warning), then signs in as admin for the integration (keys are masked), internal tags, the status page's *Language mapping* and its settings. On the status page it shows the live API endpoint instead of the stand-in's address. `ONLY=status` takes only the status page's *Language mapping* and *Connection* shots (as admin), e.g. after a change to the status page. With Ghost 6.7x the editor steps need updating: Ghost's new post settings panel no longer has `[data-test-psm-trigger]`/`#tag-input` (the October 2026 mapping change regenerated `status-mapping.png` and `status-settings.png` with `ONLY=status` against Ghost 6.71). The stand-in also answers `POST /report` (202); start the container with `SUPERTEXT_REPORT_URL` pointing at it (as above), so screenshot runs never report to the live center. Change the sample post → update `sample-de.json` (keys are the segments' inline HTML).
 
+## Demo movie
+
+`docs/images/demo.gif` (at the top of the README) is recorded by `test/docs/movie.mjs` with Supertext's shared movie kit (`test/docs/movie/movie-kit.mjs` and `assets/`: intro and outro cards, caption bar, cursor, cuts the waiting time; Inter under the SIL OFL, `assets/fonts/Inter-LICENSE.txt`); `test/docs/movie/ghost.mjs` holds what both movie scripts share (sign-in, and a mask that shows `https://blog.example.com` and `https://api.supertext.com/v1/` instead of the demo's and the stand-in's local addresses and hides the integration's keys). It shows, with a spoken line for every step (the GIF is silent), as the demo's **editor**: the sample post in English, *Settings* → *Tags* → `#translate-de-ch` (Ghost 6.7x's post settings panel), the waiting time (cut), the German draft in the posts list, and the draft opened. Run it against a **fresh** demo (the German translation must not exist yet) whose connector uses the stand-in:
+
+```bash
+cd test/docs && npm ci && cd ../..
+node test/docs/stand-in.mjs &          # fake Supertext on :8765
+# start a fresh demo container as in "Running the demo locally", wait for "[demo] Bootstrap done"
+pip install piper-tts                  # the voice (once)
+npm run docs:movie                     # BASE_URL, RESOLVE_TO, DEMO_EDITOR_* optional, as for the screenshots
+```
+
+The MP4 is narrated with [Piper](https://pypi.org/project/piper-tts/) (`pip install piper-tts`): the kit's `say()` speaks each step's line, shows its caption and holds until the line is finished; the time spent making the speech is cut. The voice model (63 MB, pinned revision, checked by SHA-256) downloads itself once into `test/docs/movie/voice/` (git-ignored; never commit it). Without Piper, or with `MOVIE_VOICE=0`, the movie is made silent with the captions only.
+
+Voice: Piper voice “alba” (en_GB), trained on a dataset from the University of Edinburgh's Centre for Speech Technology Research, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+It needs `ffmpeg` and writes 1280×720 at 30 fps. The GIF (800 px, 12 fps, keep it under 3 MB) is committed; the MP4 (about 40 s) isn't: it goes to `test/docs/movie/out/Ghost-Supertext-Translation.mp4` (git-ignored) or to `MOVIE_OUT`. `CHROMIUM_PATH` picks a Chromium. Record it again when the post settings panel or the demo's sample post changes. The kit is the same in every Supertext plugin repo: don't restyle it here.
+
+### Install movie
+
+`test/docs/movie-install.mjs` records the install and configuration movie with the same kit and voice (MP4 only, no GIF). It shows the install commands from `docs/INSTALLATION.md` in the kit's terminal (clone, `npm ci && npm run build`), then, as the demo's **administrator** (Ghost Owner): *Settings → Integrations → Add custom integration* with the demo's *Supertext Translation* integration (keys hidden) and its four webhooks, starting the connector with `GHOST_URL`, the integration's key and secret, `SUPERTEXT_API_KEY` (the fake key `st-demo-0000-0000-0000`), `TARGET_LANGUAGES` and `GHOST_UPSTREAM`, where to get an API key, the status page `/ghost/supertext/` (*Connection*: the API key check), *Language mapping* (German → *German (Switzerland) (de-CH)*, *Translation review* left off, *Save*), and the internal `#translate-…` tags editors use. Page loads are cut. Any demo whose connector uses the stand-in works (it needn't be fresh):
+
+```bash
+node test/docs/stand-in.mjs &
+npm run docs:movie:install             # BASE_URL, RESOLVE_TO, DEMO_ADMIN_* optional
+```
+
+The MP4 (about 95 s) goes to `test/docs/movie/out/Ghost-Supertext-Translation-install.mp4` (git-ignored) or to `MOVIE_OUT`; it isn't committed. Record it again when the install steps, Ghost's integration screen or the status page change.
+
 ## Dependency updates
 
 Dependabot (`.github/dependabot.yml`) opens weekly pull requests: minor and patch updates grouped into one, GitHub Actions in another, each major update on its own. Merge one when CI is green and it doesn't change what the plugin supports.

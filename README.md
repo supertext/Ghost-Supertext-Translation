@@ -4,6 +4,8 @@ Translate Ghost posts and pages with [Supertext](https://www.supertext.com) AI t
 
 Ghost has no plugin system for its admin, so this is a small **connector service** that works through Ghost's own features: internal tags to request translations, webhooks to hear about them, and the Admin API to create the translated drafts. It never writes to the post you are editing.
 
+![Demo: an editor adds the tag #translate-de-ch to an English post in Ghost, Supertext translates it, and the German draft appears in the posts list](docs/images/demo.gif)
+
 | | |
 | --- | --- |
 | **Editors** | [User guide](docs/USER_GUIDE.md): request, review and publish translations |
