@@ -18,11 +18,11 @@ function setup(opts: { normalizeLexical?: boolean; supertext?: Parameters<typeof
   const ghost = fakeGhost(opts)
   const st = fakeSupertext(opts.supertext)
   const fetchImpl = ((input: RequestInfo | URL, init?: RequestInit) =>
-    String(input).startsWith('https://api.test/') ? st.fetch(input, init) : ghost.fetch(input, init)) as typeof fetch
+    /^https:\/\/(api|review)\.test\//.test(String(input)) ? st.fetch(input, init) : ghost.fetch(input, init)) as typeof fetch
   const translator = new Translator({
     ghost: new GhostAdmin({ adminKey: ADMIN_KEY, apiUrl: 'https://ghost.test', fetch: fetchImpl }),
     sourceLanguage: 'en',
-    supertext: new SupertextClient({ apiKey: 'test-key', baseUrl: 'https://api.test/v1', fetch: fetchImpl, sleep: async () => {} }),
+    supertext: new SupertextClient({ apiKey: 'test-key', baseUrl: 'https://api.test/v1', fetch: fetchImpl, reviewUrl: 'https://review.test/v1/', sleep: async () => {} }),
   })
   const source = ghost.add('posts', {
     authors: [{ email: 'eve@example.com', id: 'u2' }],
@@ -134,10 +134,12 @@ describe('Translator', () => {
 
   it('sends nothing for a language without a Supertext code', async () => {
     const { source, st, translator } = setup()
-    const [unmapped] = parseTargetLanguages('de')
+    const [unmapped] = parseTargetLanguages('de-LI')
     const result = await translator.translate('posts', source.id, unmapped!, false)
     expect(result).toMatchObject({ errorCode: 'unsupported_language', status: 'failed' })
-    expect(result.message).toBe('The language German (de) has no Supertext language yet. Ask your administrator to map it (SUPERTEXT_LANGUAGE_MAP, e.g. de=de-CH).')
+    expect(result.message).toBe(
+      'The language German (Liechtenstein) (de-LI) has no Supertext language yet. Ask your administrator to choose one on the Supertext status page (Ghost Admin → /ghost/supertext/ → Language mapping).',
+    )
     expect(st.calls).toHaveLength(0)
   })
 
@@ -158,6 +160,16 @@ describe('Translator', () => {
     const [ignored] = parseTargetLanguages('en-US', { '*': 'more' })
     expect((await translator.translate('posts', source.id, ignored!, false)).status).toBe('created')
     expect(st.calls[0]!.form!.has('politeness')).toBe(false)
+  })
+
+  it('sends languages with Translation review through the review service, the others directly', async () => {
+    const { source, st, translator } = setup()
+    expect((await translator.translate('posts', source.id, { ...de, review: true }, false)).status).toBe('created')
+    expect((await translator.translate('posts', source.id, fr, false)).status).toBe('created')
+    const byHost = (host: string) => st.calls.filter((c) => new URL(c.url).host === host).map((c) => `${c.method} ${new URL(c.url).pathname.replace(/\/f\d+/, '/{id}')}`)
+    const roundTrip = ['POST /v1/translate/ai/file', 'GET /v1/translate/ai/file/{id}/status', 'GET /v1/translate/ai/file/{id}/translation', 'DELETE /v1/translate/ai/file/{id}']
+    expect(byHost('review.test'), 'German: upload, status, download and delete through the review service').toEqual(roundTrip)
+    expect(byHost('api.test'), 'French: directly to Supertext').toEqual(roundTrip)
   })
 
   it('reports segments that came back empty', async () => {
@@ -280,5 +292,23 @@ describe('webhook server', () => {
     const { base } = await start()
     expect(await (await fetch(`${base}/supertext/health`)).text()).toBe('ok')
     expect((await fetch(`${base}/ghost/supertext/`)).status).toBe(404)
+  })
+
+  it('serves the logo, favicon and fonts of its pages itself, cached for a year', async () => {
+    const { base } = await start()
+    const logo = await fetch(`${base}/supertext/static/supertext-logo.svg?v=1`)
+    expect(logo.status).toBe(200)
+    expect(logo.headers.get('content-type')).toBe('image/svg+xml')
+    expect(logo.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(await logo.text()).toContain('aria-label="Supertext"')
+    const font = await fetch(`${base}/supertext/static/fonts/inter-latin-wght-normal.woff2`)
+    expect(font.headers.get('content-type')).toBe('font/woff2')
+    expect((await font.arrayBuffer()).byteLength).toBeGreaterThan(10_000)
+    expect((await fetch(`${base}/supertext/static/favicon.svg`)).status).toBe(200)
+    expect((await fetch(`${base}/supertext/static/fonts/Inter-LICENSE.txt`)).status).toBe(200)
+    // Only the known files: nothing else from the disk.
+    expect((await fetch(`${base}/supertext/static/../package.json`)).status).toBe(404)
+    expect((await fetch(`${base}/supertext/static/%2e%2e/package.json`)).status).toBe(404)
+    expect((await fetch(`${base}/supertext/static/app.css`)).status).toBe(404)
   })
 })

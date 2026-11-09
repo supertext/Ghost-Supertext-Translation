@@ -1,8 +1,9 @@
 import { readFileSync, statSync } from 'node:fs'
 
+import { settingsPath } from './settings.js'
 import { type Language, parseLanguageMap, parsePoliteness, parseTargetLanguages } from './languages.js'
 import { reportsEnabled } from './vendor/supertext-plugin-health/index.js'
-import { SUPERTEXT_ENVIRONMENTS } from './supertext/client.js'
+import { REVIEW_URL, SUPERTEXT_ENVIRONMENTS } from './supertext/client.js'
 
 /**
  * All settings come from environment variables (see docs/INSTALLATION.md → All settings).
@@ -19,9 +20,17 @@ export type Config = {
   upstream: string | null
   supertextApiKey: string
   supertextApiUrl: string
+  /**
+   * `SUPERTEXT_REVIEW_URL`: the review service for target languages with *Translation review* on
+   * (default: Supertext's, `REVIEW_URL`); '' = review off for every language. Optional for tests.
+   */
+  supertextReviewUrl?: string
   sourceLanguage: string
   languages: Language[]
-  /** `SUPERTEXT_LANGUAGE_MAP`: configured code → Supertext code (targets and source). */
+  /**
+   * `SUPERTEXT_LANGUAGE_MAP`: configured code → Supertext code (targets and source). Overrides
+   * the mapping chosen on the status page (`SUPERTEXT_SETTINGS_FILE`) for the languages it names.
+   */
   languageMap: Record<string, string>
   /** "Send version information to Supertext": `SUPERTEXT_VERSION_REPORTS` (default on). */
   versionReports: boolean
@@ -29,6 +38,8 @@ export type Config = {
   connectorUrl: string | null
   /** JSON file for the Commando Center state (what was reported, the latest key check). */
   stateFile: string | null
+  /** JSON file for the settings chosen on the status page (`SUPERTEXT_SETTINGS_FILE`, else next to `STATE_FILE`). */
+  connectorSettingsFile?: string | null
   /** `en`, `de`, `fr`, `it`, or `auto` (status page follows the browser's Accept-Language). */
   uiLanguage: string
   settingsFile: string | null
@@ -38,6 +49,13 @@ export type Config = {
 }
 
 const env = (name: string, fallback = '') => (process.env[name] ?? '').trim() || fallback
+
+/** `SUPERTEXT_REVIEW_URL`: unset = Supertext's review service; empty, `off`, `0`, `false` or `no` = off. */
+export function reviewUrl(value: string | undefined): string {
+  if (value === undefined) return REVIEW_URL
+  const v = value.trim()
+  return /^(off|0|false|no|none)?$/i.test(v) ? '' : v
+}
 
 export function loadConfig(): Config {
   const upstream = env('GHOST_UPSTREAM') || null
@@ -61,6 +79,7 @@ export function loadConfig(): Config {
   const connectorUrl = env('CONNECTOR_URL').replace(/\/+$/, '')
 
   return {
+    connectorSettingsFile: settingsPath(env('SUPERTEXT_SETTINGS_FILE') || null, env('STATE_FILE') || null),
     connectorUrl: /^https?:\/\/[^/]/i.test(connectorUrl) ? connectorUrl : null,
     ghostSecrets: () => {
       const file = fileSecrets()
@@ -80,6 +99,7 @@ export function loadConfig(): Config {
     stateFile: env('STATE_FILE') || null,
     supertextApiKey: env('SUPERTEXT_API_KEY'),
     supertextApiUrl: env('SUPERTEXT_API_URL', SUPERTEXT_ENVIRONMENTS.live),
+    supertextReviewUrl: reviewUrl(process.env.SUPERTEXT_REVIEW_URL),
     uiLanguage: env('UI_LANGUAGE', 'auto').toLowerCase(),
     upstream,
     versionReports: reportsEnabled(null, env('SUPERTEXT_VERSION_REPORTS') || null),
