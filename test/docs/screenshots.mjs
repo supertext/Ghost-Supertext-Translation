@@ -71,7 +71,11 @@ const box = async (locator) => (await locator.boundingBox()) ?? (await locator.e
 
 /** Admin API call from inside the page, so it uses the browser's session and host mapping. */
 const adminApi = (page, path) =>
-  page.evaluate(async (url) => (await fetch(url, { headers: { 'Accept-Version': 'v6.0' } })).json(), `${B}/ghost/api/admin/${path}`)
+  page.evaluate(async (url) => {
+    const res = await fetch(url, { headers: { 'Accept-Version': 'v6.0' } })
+    // Ghost answers with an HTML page while it is busy (e.g. right after the connector wrote a post): poll again.
+    return (res.headers.get('content-type') ?? '').includes('json') ? res.json() : {}
+  }, `${B}/ghost/api/admin/${path}`)
 
 /** Polls the Admin API (as the signed-in user) until `filter` matches a post. */
 async function waitForPost(page, filter, timeout = 60000) {
