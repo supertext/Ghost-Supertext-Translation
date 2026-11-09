@@ -1,6 +1,6 @@
 {
   "name": "ghost-supertext-translation",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Supertext AI translation for Ghost: tag a post, get a translated draft",
   "license": "MIT",

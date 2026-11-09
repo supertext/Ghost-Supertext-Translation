@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-09
+
+First stable release. Every plugin release is now tested end to end against the live Supertext API (`.github/workflows/e2e.yml`).
+
 ### Added
 
 - Docs: demo movie in the README (`docs/images/demo.gif`, recorded from the demo against the stand-in with `npm run docs:movie`; the MP4 version, not committed, is narrated with the Piper voice “alba”) and an install and configuration movie (`npm run docs:movie:install`: the install commands, the custom integration and its webhooks, starting the connector with `SUPERTEXT_API_KEY`, the status page's key check and *Language mapping*; narrated MP4, not committed).
