@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Removed
+
+- Support for Node.js 20 for the connector (end of life since 30 April 2026). It now needs Node.js 22 or newer (`engines`); CI tests Node 22, 24 and 26. Ghost 6 itself needs Node 22 or 24.
+
+### Changed
+
+- Development: the connector is type-checked and built with TypeScript 7 (from 5.9).
+
 ## [1.0.0] - 2026-11-09
 
 First stable release. Every plugin release is now tested end to end against the live Supertext API (`.github/workflows/e2e.yml`).

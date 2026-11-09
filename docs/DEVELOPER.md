@@ -188,7 +188,7 @@ The real Ghost round trip is covered by the demo container (below) and the scree
 
 ## CI / deploy
 
-GitHub Actions (`.github/workflows/ci.yml`): typecheck, tests and build on Node 20, 22, 24 and 26. Railway builds `demo/Dockerfile` from `main` on every push.
+GitHub Actions (`.github/workflows/ci.yml`): typecheck, tests and build on Node 22, 24 and 26. Railway builds `demo/Dockerfile` from `main` on every push.
 
 ## Demo
 
@@ -311,7 +311,9 @@ Dependabot (`.github/dependabot.yml`) opens weekly pull requests: minor and patc
 
 `.github/workflows/dependabot-merge.yml` merges a minor or patch package update by itself once every other check on its pull request has passed (it waits up to 85 minutes and leaves the pull request alone if a check fails). GitHub Actions updates and majors stay for a person: the workflow's built-in token can't merge changes to workflow files, and a major needs a decision. Merges by the workflow don't start CI on `main`; the weekly health check looks at `main`.
 
-Some major versions are ignored on purpose: TypeScript (7.x is the native compiler, which the type-checking and build tools here don't support yet) and `@types/node` (the types must match the oldest Node version the plugin supports, not the newest). Lift an ignore rule when the plugin moves to the new version.
+One major version is ignored on purpose: `@types/node` (the types must match the oldest Node version the connector supports, 22, not the newest). Lift the rule when the minimum Node version moves.
+
+The connector is type-checked and built with TypeScript 7 (the native compiler, `tsc`). `tsconfig.json` lists `"types": ["node"]` because TypeScript 6 and later no longer load every `@types` package by default.
 
 ## Code quality and security checks
 
