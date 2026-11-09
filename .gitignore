@@ -9,3 +9,7 @@ coverage/
 test/docs/node_modules/
 test/docs/movie/out/
 test/docs/movie/voice/
+test/e2e/node_modules/
+test/e2e/artifacts/
+test/docs/error-*.png
+test/docs/stand-in.log

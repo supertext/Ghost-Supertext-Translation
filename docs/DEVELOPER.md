@@ -36,7 +36,7 @@ src/
   vendor/supertext-plugin-health/ copy of Supertext Plugin Health (TypeScript sources; never edit, see *Supertext Plugin Health*)
 public/               supertext-logo.svg, favicon.svg, fonts/ (Inter, SIL Open Font License) for the connector's pages
 demo/                 Railway demo image (Ghost 6 + connector) and its bootstrap
-test/                 Vitest suites, fakes of Ghost and Supertext; test/docs = screenshots
+test/                 Vitest suites, fakes of Ghost and Supertext; test/docs = screenshots; test/e2e = end-to-end tests against the real API
 ```
 
 ### Flow of one request
@@ -160,6 +160,7 @@ Protocol: [Commando-Center-Supertext-Translation](https://github.com/Supertext/C
 - Staff can only be created by invite, and an invite is only accepted (`status: sent`) if its mail went out.
 - The session cookie has path `/ghost`.
 - Admin API supports `field:~'substring'` filters, used for the marker.
+- Ghost 6.71's post editor is a React screen: the screenshot script and the E2E test find the post settings and the tag picker by `data-testid` (`settings-menu-toggle`, `settings-tags-input`, `settings-tags-list`, `settings-tags-token`), no longer by the Ember selectors of earlier 6.x versions.
 
 ## Local setup
 
@@ -250,7 +251,7 @@ node test/docs/stand-in.mjs &          # fake Supertext on :8765 (PORT=… for a
 npm run docs:screenshots               # BASE_URL, RESOLVE_TO, DEMO_* variables optional
 ```
 
-The script signs in as the editor, adds `#translate-de-ch`, captures the tag picker, posts list, status page, German draft, edits the draft and requests again (the *Not overwritten* warning), then signs in as admin for the integration (keys are masked), internal tags, the status page's *Language mapping* and its settings. On the status page it shows the live API endpoint instead of the stand-in's address. `ONLY=status` takes only the status page's *Language mapping* and *Connection* shots (as admin), e.g. after a change to the status page. With Ghost 6.7x the editor steps need updating: Ghost's new post settings panel no longer has `[data-test-psm-trigger]`/`#tag-input` (the October 2026 mapping change regenerated `status-mapping.png` and `status-settings.png` with `ONLY=status` against Ghost 6.71). The stand-in also answers `POST /report` (202); start the container with `SUPERTEXT_REPORT_URL` pointing at it (as above), so screenshot runs never report to the live center. Change the sample post → update `sample-de.json` (keys are the segments' inline HTML).
+The script signs in as the editor, adds `#translate-de-ch`, captures the tag picker, posts list, status page, German draft, edits the draft and requests again (the *Not overwritten* warning), then signs in as admin for the integration (keys are masked), internal tags, the status page's *Language mapping* and its settings. On the status page it shows the live API endpoint instead of the stand-in's address. `ONLY=status` takes only the status page's *Language mapping* and *Connection* shots (as admin), e.g. after a change to the status page. The editor steps use the test ids of Ghost 6.7x's post settings panel (`settings-menu-toggle`, `settings-tags-input`); dates and times are frozen, so the images only change when the UI does. The stand-in also answers `POST /report` (202); start the container with `SUPERTEXT_REPORT_URL` pointing at it (as above), so screenshot runs never report to the live center. Change the sample post → update `sample-de.json` (keys are the segments' inline HTML).
 
 ## Demo movie
 
@@ -280,6 +281,29 @@ npm run docs:movie:install             # BASE_URL, RESOLVE_TO, DEMO_ADMIN_* opti
 ```
 
 The MP4 (about 95 s) goes to `test/docs/movie/out/Ghost-Supertext-Translation-install.mp4` (git-ignored) or to `MOVIE_OUT`; it isn't committed. Record it again when the install steps, Ghost's integration screen or the status page change.
+
+## End-to-end tests
+
+The Vitest suites use fakes of Ghost and Supertext. `.github/workflows/e2e.yml` also tests the real demo against the **real Supertext API**, so changes on Supertext's or Ghost's side (language codes, regional variants, formatting, rate limits, Ghost Admin) show up. It runs on every push to `main` that touches the connector, the demo or the tests, on pull requests that change the E2E test or workflow, every Monday, and by hand (*Actions → E2E → Run workflow*). It builds the demo image once (Docker layer cache in GitHub Actions) and starts it twice, each a fresh container with demo account passwords made up for the run (masked in the log). Both use `www.example.com` (port 8081 for the live demo, 80 for the docs demo), mapped to the container itself with `--add-host` and to `127.0.0.1` in the browser, because Ghost only sends webhooks to a host name with a domain:
+
+1. **Real API** (repository or organization secret `SUPERTEXT_API_KEY`; without it these steps are skipped with a warning). Version reports are off (`SUPERTEXT_VERSION_REPORTS=0`), so CI runs don't appear in the Commando Center. A `[demo] WARNING` from the bootstrap fails the run.
+   - `test/e2e/features.mjs` asks the live `GET features` (cost-free, no connector or SDK code) whether every pair the demo translates (`en` → `de-CH`, `fr-CH`) is offered; a missing pair fails the run. Whether the connector's own language list matches the API is the SDK's job (its own tests).
+   - `test/e2e/live.mjs` (Playwright) signs in to Ghost Admin as the demo **editor**, reads the target languages from the status page and adds every `#translate-*` tag to the sample post in the post settings, as the user guide describes. When the status page shows the requests finished, it checks through the status page and Ghost's Admin API (with the editor's session): one translation per language, a draft (never published), with the marker pointing at the source; title, excerpt and every text block filled and at least 80 % of them changed (a single word may stay the same; unchanged ones are printed as `note`); no `data-st-id`, `data-st-ph`, `st-ph-` or `data-n` left; links (and their targets), bold, italics, code (unchanged), list items, headings, callout and button cards kept; the text is in the target language (common words of each language counted) and de-CH has no "ß". Then it removes and re-adds the tags: the status page must say *Updated* and the same drafts must be updated in place (no duplicates). Finally the source post must be unchanged and still published, and neither Ghost Admin nor the status page may show an error. Each run translates the sample post twice into two languages (around 4,000 characters on the key's account).
+2. **Stand-in API**: the docs screenshots (see *Docs screenshots*), so the images don't change with each machine translation. If `docs/images/` changed, a second job pushes the branch `automation/docs-screenshots` and opens (or updates) the pull request "Docs: regenerate screenshots". This needs *Settings → Actions → General → Allow GitHub Actions to create and approve pull requests*.
+
+If a run fails, the artifact `e2e-debug` has the status pages the test saw, the demo containers' logs and the stand-in log. Locally:
+
+```bash
+cd test/e2e && npm ci && npx playwright install chromium
+# fresh demo container with a real SUPERTEXT_API_KEY, e.g. on port 8081:
+#   docker run -p 8081:8081 -e PORT=8081 -e url=http://www.example.com:8081 --add-host www.example.com:127.0.0.1 \
+#     -e SUPERTEXT_API_KEY=… -e SUPERTEXT_VERSION_REPORTS=0 -e DEMO_ADMIN_EMAIL=… -e DEMO_ADMIN_PASSWORD=… \
+#     -e DEMO_EDITOR_EMAIL=… -e DEMO_EDITOR_PASSWORD=… ghost-supertext-demo
+SUPERTEXT_API_KEY=… E2E_TARGETS=de-CH,fr-CH node features.mjs
+BASE_URL=http://www.example.com:8081 EDITOR_EMAIL=… EDITOR_PASSWORD=… npm run live
+```
+
+The screenshot script freezes dates and times (job times, webhooks' *Last triggered*, "x minutes ago") to fixed values, so the images only change when the UI does.
 
 ## Dependency updates
 
