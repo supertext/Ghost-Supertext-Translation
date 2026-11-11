@@ -79,7 +79,7 @@ export const en = {
   'page.mappingInvalid': 'This is not a Supertext language code. Choose one from the list.',
   'page.mappingTooLarge': 'The request is too large.',
   'page.reviewLabel': 'Translation review',
-  'page.reviewHelp': 'Translations into this language go through Supertext’s review service, so reviewers can check and correct them on the website with the Supertext Localization Review extension. Their corrections are used the next time the post or page is translated.',
+  'page.reviewHelp': 'Translations into this language go through Supertext\'s review service, so reviewers can check and correct them on the website with the Supertext Localization Review extension. Their corrections are used the next time the post or page is translated.',
   'page.reviewOff': 'Off for every language: SUPERTEXT_REVIEW_URL is empty.',
   'page.reviewService': 'Review service',
 
