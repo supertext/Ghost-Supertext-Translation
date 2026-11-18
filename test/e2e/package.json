@@ -7,6 +7,6 @@
     "live": "node live.mjs"
   },
   "devDependencies": {
-    "playwright": "1.65.0"
+    "playwright": "1.65.1"
   }
 }
