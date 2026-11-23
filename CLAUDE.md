@@ -100,3 +100,7 @@ Lessons from testing against the live API (October 2026), to apply in every plug
 - End-to-end tests against the real Supertext API: `.github/workflows/e2e.yml` with `test/e2e/` (see "End-to-end tests" in `docs/DEVELOPER.md`). The key is only the GitHub secret `SUPERTEXT_API_KEY`, set by Remy; sessions don't use a live key. Behaviour changes need matching checks in `test/e2e/live.mjs`.
 - Screenshots: `npm run docs:screenshots` against a fresh local demo container and `test/docs/stand-in.mjs` (see `docs/DEVELOPER.md` → Docs screenshots).
 - Movies: the README's demo movie `npm run docs:movie` (`test/docs/movie.mjs`, shared kit in `test/docs/movie/`) and the install and configuration movie `npm run docs:movie:install` (`test/docs/movie-install.mjs`, same kit, MP4 only); see `docs/DEVELOPER.md` → Demo movie.
+
+## Live E2E runs share one API key (always)
+
+Every push to `main` that touches the plugin, the demo or the tests starts the live E2E run, and all Supertext plugin repos share one Supertext API key, which is rate-limited per second. When the same kind of change goes to several repos, push them one repo at a time, at least 3 minutes apart (a loop with `sleep 180`), never in parallel. Docs-only changes (`docs/`, `README.md`, `CHANGELOG.md`, `CLAUDE.md`) don't start it and can go together. A live run that failed with `RATE_LIMIT_EXCEEDED` collided with another repo's run, it isn't a bug: rerun it on its own.
