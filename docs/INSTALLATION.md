@@ -151,7 +151,7 @@ plus `#translate-all` and `#retranslate-all`. You find them under **Tags → Int
 
 The status page's **Connection** section shows the rest of the configuration:
 
-![The connection section of the Supertext status page: Ghost, API key check, Supertext endpoint and the connector version](images/status-settings.png)
+![The connection section of the Supertext status page: Ghost, API key check, Supertext endpoint, the connector version, version information and the Send configuration to Supertext button](images/status-settings.png)
 
 Its **Connection** section also shows the **Connector version** (from the connector's `package.json`). Ghost has no plugin list, so this is where you check which version you run, for example before and after an update; a release version links to its release notes on GitHub. The startup log shows it too (`[supertext] Connector 0.1.0 listening on …`).
 
@@ -233,6 +233,8 @@ Changing `TARGET_LANGUAGES`, `SUPERTEXT_LANGUAGE_MAP` or `SUPERTEXT_REVIEW_URL` 
 ### Version information and the API key check
 
 **Send version information to Supertext** is on by default. The connector then sends the site URL and the versions of this connector, Ghost and Node.js to Supertext when it starts after an update and when the API key changes, so Supertext support can see which version you run. A report contains exactly: the site URL (`GHOST_URL`), the connector's name and version, the Ghost and Node.js versions, the Supertext SDK version, whether a key is set, the result of the API key check below (status, time, HTTP status, Supertext's error code) and the address of the ping endpoint. **No content, no API key and no personal data are sent.** Reports go from the connector, never from the browser; a report that fails is not retried for an hour and never slows down or breaks a translation. Set `SUPERTEXT_VERSION_REPORTS=0` and restart the connector to turn it off: nothing is sent at all then, and the ping endpoint answers 404. The status page shows whether it is on.
+
+**Send configuration to Supertext** (status page, Ghost Owner and Administrator): when you contact Supertext support, this button sends, in one report, Ghost's themes (name, version, which one is active) and the Supertext language of each language. Nothing else is sent, and nothing at all while version information is off. The connector reads the themes with the integration's Admin API key.
 
 **The API key check** runs whether or not version information is sent: when the connector starts with a key it hasn't checked yet, when it runs its code (status page, a translation) and the key in `SUPERTEXT_API_KEY` changed (compared by a fingerprint kept locally, never the key itself), and when Supertext rejects the key during a translation. It's Supertext's cost-free `features` call; nothing is translated or billed. The status page shows the latest result with its time: *the connection works*, *Supertext rejected the API key* (with the links to create an account and generate a key), *no API key is set*, *Supertext can't be reached* or *Supertext answered with an error*.
 

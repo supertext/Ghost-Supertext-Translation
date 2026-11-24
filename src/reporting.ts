@@ -16,8 +16,10 @@ import { dirname } from 'node:path'
 import type { Config } from './config.js'
 import {
   EMPTY_REPORTER_STATE,
+  type Extension,
   InstallationReporter,
   type KeyCheck,
+  type LanguageMapping,
   pingResponse,
   type PingResponse,
   type ReporterOptions,
@@ -124,7 +126,7 @@ export class Reporting {
     return pingResponse(challenge, { enabled: this.enabled, plugin: PLUGIN_NAME })
   }
 
-  reporter(ghostVersion: string | null): InstallationReporter {
+  reporter(ghostVersion: string | null, languages?: LanguageMapping[]): InstallationReporter {
     const clientOptions = {
       baseUrl: this.config.supertextApiUrl,
       userAgent: USER_AGENT,
@@ -139,6 +141,7 @@ export class Reporting {
       siteUrl: this.config.siteUrl,
       sdkVersion: SDK_VERSION,
       system: { name: 'Ghost', version: ghostVersion },
+      ...(languages ? { languages: () => languages } : {}),
       ...this.deps.reporterOverrides,
     })
   }
@@ -167,6 +170,29 @@ export class Reporting {
     return task
   }
 
+  /**
+   * "Send configuration to Supertext" (status page): Ghost's themes and every language with its
+   * Supertext code in one `extensions` report, sent now (also within the hour after a failed report).
+   * Null while version reports are off. Never throws.
+   */
+  sendConfiguration(extensions: Extension[], languages: LanguageMapping[]): Promise<ReporterResult | null> {
+    const task = this.queue.then(async () => {
+      if (!this.enabled) return null
+      try {
+        const version = await this.deps.ghostVersion().catch(() => null)
+        if (version) this.knownGhostVersion = version
+        const result = await this.reporter(this.knownGhostVersion, languages).sendExtensions(this.store.load(), extensions)
+        this.store.save(result.state)
+        return result
+      } catch (err) {
+        this.deps.log?.(`Configuration not sent: ${err instanceof Error ? err.message : String(err)}`)
+        return null
+      }
+    })
+    this.queue = task
+    return task
+  }
+
   /** For requests: runs in the background, so nobody waits for Supertext or the center. */
   inBackground(action: Action, httpStatus?: number): Promise<ReporterResult | null> {
     const task = this.run(action, httpStatus)
@@ -182,4 +208,19 @@ export class Reporting {
       return null
     }
   }
+}
+
+/**
+ * Ghost's themes for "Send configuration to Supertext" (Ghost has no plugins), from the Admin API's
+ * `themes/`: the name from the theme's package.json (else its folder), its version, whether active.
+ */
+export function installedThemes(list: unknown): Extension[] {
+  if (!Array.isArray(list)) return []
+  const out: Extension[] = []
+  for (const theme of list as Array<{ name?: unknown; active?: unknown; package?: { name?: unknown; version?: unknown } | null }>) {
+    const name = typeof theme?.package?.name === 'string' && theme.package.name ? theme.package.name : typeof theme?.name === 'string' ? theme.name : ''
+    if (!name) continue
+    out.push({ active: theme.active === true, name, type: 'theme', version: typeof theme?.package?.version === 'string' ? theme.package.version : null })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
 }

@@ -4,12 +4,18 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- *Send configuration to Supertext* on the status page (Ghost Owner and Administrator): sends Ghost's themes and the language mapping to Supertext support in one report (Supertext Plugin Health 0.4.0). Nothing is sent while version reports are off.
+
 ### Removed
 
 - Support for Node.js 20 for the connector (end of life since 30 April 2026). It now needs Node.js 22 or newer (`engines`); CI tests Node 22, 24 and 26. Ghost 6 itself needs Node 22 or 24.
 
 ### Changed
 
+- Version reports go to `https://pluginhealth.supertext.com` (Supertext Plugin Health 0.4.0).
+- The docs screenshots show real Supertext translations: CI takes them with the live API (secret `SUPERTEXT_API_KEY`); the stand-in API translates only without the key. Version reports still go to the stand-in.
 - Development: the connector is type-checked and built with TypeScript 7 (from 5.9).
 
 ## [1.0.0] - 2026-11-09

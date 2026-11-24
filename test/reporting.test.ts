@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Config } from '../src/config.js'
 import { parseTargetLanguages } from '../src/languages.js'
-import { callbackUrl, PLUGIN_NAME, Reporting, StateStore } from '../src/reporting.js'
+import { callbackUrl, installedThemes, PLUGIN_NAME, Reporting, StateStore } from '../src/reporting.js'
 import { renderStatusPage, type StatusPageData } from '../src/status-page.js'
 import { SDK_VERSION } from '../src/vendor/supertext-sdk/index.js'
 import { apiKeyFingerprint } from '../src/vendor/supertext-sdk/v1/index.js'
@@ -97,7 +97,7 @@ describe('state', () => {
     writeFileSync(join(dir, 'broken.json'), '{nope')
     expect(new StateStore(join(dir, 'broken.json')).load().reportedVersions).toBeNull()
     const blocked = new StateStore(join(dir, 'broken.json', 'state.json'))
-    expect(() => blocked.save({ keyCheck: null, lastFailureAt: null, reportedKeyStatus: 'ok', reportedVersions: 'x' })).not.toThrow()
+    expect(() => blocked.save({ keyCheck: null, keyChecks: null, lastFailureAt: null, reportedKeyStatus: 'ok', reportedKeyStatuses: null, reportedVersions: 'x' })).not.toThrow()
     expect(blocked.load().reportedVersions).toBe('x') // kept in memory
   })
 })
@@ -138,7 +138,8 @@ describe('reports', () => {
     expect(await r.run('onRequest')).toMatchObject({ event: null, sent: false })
     expect(center.reports).toHaveLength(0)
     expect(st.calls).toHaveLength(0)
-    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(old)
+    // Plugin Health 0.2+ adds keyChecks and reportedKeyStatuses (null with one key); everything else is kept.
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ ...old, keyChecks: null, reportedKeyStatuses: null })
   })
 
   it('reports an upgrade when the Ghost version changes, but not while Ghost is unreachable', async () => {
@@ -221,5 +222,60 @@ describe('status page', () => {
     const html = page(undefined)
     expect(html).toContain('German (Liechtenstein) <span class="bad">No Supertext language: choose one under Language mapping</span>')
     expect(html).toContain('Supertext offers no formal/informal choice for this language: remove it from SUPERTEXT_POLITENESS')
+  })
+})
+
+describe('Send configuration to Supertext', () => {
+  it('lists Ghost’s themes with their versions and which one is active', () => {
+    expect(
+      installedThemes([
+        { active: true, name: 'source', package: { name: 'source', version: '1.5.2' } },
+        { active: false, name: 'casper', package: null },
+        { active: false },
+      ]),
+    ).toEqual([
+      { active: false, name: 'casper', type: 'theme', version: null },
+      { active: true, name: 'source', type: 'theme', version: '1.5.2' },
+    ])
+    expect(installedThemes(undefined)).toEqual([])
+  })
+
+  it('sends the themes and the language mapping in one extensions report, nothing with reports off', async () => {
+    const { center, r } = reporting()
+    const themes = [{ active: true, name: 'source', type: 'theme', version: '1.5.2' }]
+    const languages = [{ code: 'en', supertext: 'en' }, { code: 'de-CH', supertext: 'de-CH' }, { code: 'de-LI', supertext: null }]
+    expect(await r.sendConfiguration(themes, languages)).toMatchObject({ event: 'extensions', sent: true })
+    expect(center.reports).toHaveLength(1)
+    expect(center.reports[0]).toMatchObject({ event: 'extensions', extensions: [{ name: 'source', version: '1.5.2' }], languages })
+    expect(JSON.stringify(center.reports[0])).not.toContain('test-key')
+
+    const off = reporting({ versionReports: false })
+    expect(await off.r.sendConfiguration(themes, languages)).toBeNull()
+    expect(off.center.reports).toHaveLength(0)
+  })
+
+  it('shows the button to administrators with the result of the last send', () => {
+    const html = (configuration?: StatusPageData['configuration']) =>
+      renderStatusPage({
+        configuration,
+        ghost: { detail: '', ok: true },
+        jobs: [],
+        languages: parseTargetLanguages('de-CH'),
+        locale: 'en',
+        reports: { callbackUrl: null, check: null, enabled: true },
+        siteTitle: 'Blog',
+        siteUrl: 'https://blog.example.com',
+        sourceLanguage: 'en',
+        supertext: { endpoint: 'https://api.supertext.com/v1/', keyConfigured: true },
+        version: '1.0.0',
+        viewer: 'Anna',
+        webhookSecret: true,
+      })
+    expect(html()).not.toContain('data-supertext-send-configuration')
+    const page = html({ csrf: 'token-1', formAction: '/ghost/supertext/configuration', result: 'sent' })
+    expect(page).toContain('action="/ghost/supertext/configuration"')
+    expect(page).toContain('value="token-1"')
+    expect(page).toContain('Send configuration to Supertext')
+    expect(page).toContain('Configuration sent.')
   })
 })

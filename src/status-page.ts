@@ -22,6 +22,8 @@ export type StatusPageData = {
   languages: Language[]
   /** Commando Center: the setting, the ping address and the latest API key check. */
   reports?: { enabled: boolean; callbackUrl: string | null; check: KeyCheck | null }
+  /** "Send configuration to Supertext" (Ghost administrators only); `result` after sending. */
+  configuration?: { csrf: string; formAction: string; result: 'sent' | 'off' | 'failed' | null }
   jobs: Job[]
   /** The language mapping form (one combo box per language); absent outside proxy mode. */
   mapping?: {
@@ -173,6 +175,17 @@ export const pageHeader = (locale: UiLocale, version: string, siteTitle: string,
 </header>`
 
 /** The staff-only page at /supertext/: how to translate, recent results, configuration. */
+/** "Send configuration to Supertext": the button (a form with the page's CSRF token) and the result of the last send. */
+function configurationHtml(d: StatusPageData, c: NonNullable<StatusPageData['configuration']>): string {
+  const L = (key: MessageKey, params?: Params) => t(d.locale, key, params, e)
+  const result = c.result === 'sent' ? `<span class="ok">${L('page.configSent')}</span>` : c.result === 'off' ? `<span class="muted">${L('page.configOff')}</span>` : c.result === 'failed' ? `<span class="bad">${L('page.configFailed')}</span>` : ''
+  return `<form method="post" action="${e(c.formAction)}" class="send-configuration" data-supertext-send-configuration>
+  <input type="hidden" name="csrf" value="${e(c.csrf)}">
+  <p><button type="submit"${d.reports?.enabled === false ? ' disabled' : ''}>${L('page.config')}</button> ${result}</p>
+  <p class="muted">${L('page.configHelp')}</p>
+</form>`
+}
+
 export function renderStatusPage(d: StatusPageData): string {
   const L = (key: MessageKey, params?: Params) => t(d.locale, key, params, e)
   const jobMessage = (j: Job) => (j.localized?.length ? format(d.locale, j.localized, e) : e(j.message))
@@ -269,7 +282,7 @@ ${d.mapping ? mappingHtml(d, d.mapping) : ''}
     <dt>${L('page.version')}</dt><dd>${versionHtml(d.version)}</dd>
     <dt>${L('page.reports')}</dt><dd>${
       d.reports?.enabled === false ? L('page.reportsOff') : `${L('page.reportsOn')}${d.reports?.callbackUrl ? ` <span class="muted">· ${L('page.pingUrl')}: ${e(d.reports.callbackUrl)}</span>` : ''}`
-    }<br><span class="muted">${L('page.reportsHelp')}</span></dd>
+    }<br><span class="muted">${L('page.reportsHelp')}</span>${d.configuration ? configurationHtml(d, d.configuration) : ''}</dd>
     <dt>${L('page.signedInAs')}</dt><dd>${e(d.viewer)}</dd>
   </dl>
 </section>

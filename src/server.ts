@@ -6,7 +6,7 @@ import { parseWebhook, verifySignature } from './ghost/webhook.js'
 import { JobLog } from './jobs.js'
 import { format, isUiLocale, type MessageKey, pickLocale, t, type UiLocale } from './i18n/index.js'
 import { type Language, managedTags, remapLanguages, requestsFromTags, sourceCodeOrNull } from './languages.js'
-import { PING_PATH, Reporting } from './reporting.js'
+import { installedThemes, PING_PATH, Reporting } from './reporting.js'
 import { CsrfTokens, effectiveMapping, mappingRows, readMappingForm, readReviewForm, reviewOn, SettingsStore } from './settings.js'
 import { renderStatusPage } from './status-page.js'
 import { collect } from './collect.js'
@@ -26,6 +26,8 @@ const log = (msg: string) => console.log(`[supertext] ${msg}`)
 export const STATUS_PATH = '/ghost/supertext/'
 /** The status page's settings form posts here (under /ghost/ for the staff session cookie). */
 export const SETTINGS_PATH = `${STATUS_PATH}settings`
+/** "Send configuration to Supertext" on the status page (administrators). */
+export const CONFIGURATION_PATH = `${STATUS_PATH}configuration`
 /** Ghost roles that may change the connector's settings. */
 const ADMIN_ROLES = new Set(['Owner', 'Administrator'])
 /** Translation files: the page, its export and its import (staff with EDITOR_ROLES). */
@@ -236,6 +238,42 @@ export function createApp(config: Config, deps: AppDeps = {}): App {
     res.end()
   }
 
+  /** "Send configuration to Supertext": Ghost administrators only, with the page's CSRF token and a same-origin request. */
+  async function handleConfiguration(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!config.upstream) return send(res, 404, 'Not found')
+    const locale = pickLocale(config.uiLanguage, header(req, 'accept-language'))
+    const refuse = (status: number, key: MessageKey) => send(res, status, t(locale, key))
+    const user = await staffUser(req)
+    if (!user) return refuse(401, 'page.mappingSignIn')
+    if (!user.admin) return refuse(403, 'page.mappingAdminOnly')
+    const origin = header(req, 'origin')
+    if (origin && origin !== new URL(config.siteUrl).origin) return refuse(403, 'page.mappingCrossSite')
+    let form: URLSearchParams
+    try {
+      form = new URLSearchParams(await readBody(req, 10_000))
+    } catch {
+      return refuse(413, 'page.mappingTooLarge')
+    }
+    if (!csrf.verify(user.session, form.get('csrf'))) return refuse(403, 'page.mappingExpired')
+    let outcome: 'sent' | 'off' | 'failed' = 'off'
+    if (reporting.enabled) {
+      let themes: ReturnType<typeof installedThemes> = []
+      try {
+        themes = installedThemes(await ghost()?.themes())
+      } catch (err) {
+        log(`Could not read the themes: ${err instanceof Error ? err.message : String(err)}`)
+      }
+      const languageList = [
+        { code: config.sourceLanguage, supertext: sourceCodeOrNull(config.sourceLanguage, languageMap()) },
+        ...languages().map((l) => ({ code: l.code, supertext: l.target })),
+      ]
+      const result = await reporting.sendConfiguration(themes, languageList)
+      outcome = result?.sent ? 'sent' : 'failed'
+    }
+    res.writeHead(303, { 'Cache-Control': 'no-store', Location: `${STATUS_PATH}?config=${outcome}#settings` })
+    res.end()
+  }
+
   async function handleStatus(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
     if (!config.upstream) {
       return send(res, 404, 'The status page is only available when the connector runs in front of Ghost (GHOST_UPSTREAM).')
@@ -275,6 +313,13 @@ export function createApp(config: Config, deps: AppDeps = {}): App {
         saved: url.searchParams.get('saved') === '1' ? 'saved' : url.searchParams.get('saved') === 'memory' ? 'memory' : null,
       },
       reports: { callbackUrl: reporting.callbackUrl, check: reporting.lastCheck(), enabled: reporting.enabled },
+      configuration: user.admin
+        ? {
+            csrf: csrf.token(user.session),
+            formAction: CONFIGURATION_PATH,
+            result: (['sent', 'off', 'failed'] as const).find((r) => r === url.searchParams.get('config')) ?? null,
+          }
+        : undefined,
       siteTitle,
       siteUrl: config.siteUrl,
       sourceLanguage: config.sourceLanguage,
@@ -520,6 +565,13 @@ export function createApp(config: Config, deps: AppDeps = {}): App {
       }
       // Under /ghost/ so the browser sends Ghost's staff session cookie (its path is /ghost).
       if (path === STATUS_PATH || path === STATUS_PATH.slice(0, -1)) return handleStatus(req, res, url)
+      if (path === CONFIGURATION_PATH) {
+        if (req.method !== 'POST') {
+          res.writeHead(303, { Location: STATUS_PATH })
+          return void res.end()
+        }
+        return handleConfiguration(req, res)
+      }
       if (path === SETTINGS_PATH) {
         if (req.method !== 'POST') {
           res.writeHead(303, { Location: STATUS_PATH })

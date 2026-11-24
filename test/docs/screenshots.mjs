@@ -20,7 +20,6 @@ const EDITOR = [process.env.DEMO_EDITOR_EMAIL || 'editor@demo.example.com', proc
 const LIVE_API = 'https://api.supertext.com/v1/'
 const OUT = new URL('../../docs/images', import.meta.url).pathname
 const SOURCE_TITLE = 'Translate your Ghost posts with Supertext'
-const GERMAN_TITLE = 'Übersetzen Sie Ihre Ghost-Beiträge mit Supertext'
 
 const browser = await chromium.launch({ args: [`--host-resolver-rules=MAP ${new URL(B).hostname} ${RESOLVE_TO}`] })
 
@@ -78,7 +77,7 @@ const adminApi = (page, path) =>
   }, `${B}/ghost/api/admin/${path}`)
 
 /** Polls the Admin API (as the signed-in user) until `filter` matches a post. */
-async function waitForPost(page, filter, timeout = 60000) {
+async function waitForPost(page, filter, timeout = 300000) {
   const end = Date.now() + timeout
   while (Date.now() < end) {
     const posts = (await adminApi(page, `posts/?filter=${encodeURIComponent(filter)}&include=tags`)).posts ?? []
@@ -86,6 +85,16 @@ async function waitForPost(page, filter, timeout = 60000) {
     await page.waitForTimeout(1000)
   }
   throw new Error(`No post matched ${filter}`)
+}
+
+/** Opens the status page once no job is running any more (real translations take a while). */
+async function settledStatusPage(page, timeout = 300000) {
+  const end = Date.now() + timeout
+  for (;;) {
+    await statusPage(page)
+    if ((await page.locator('#jobs .badge.running').count()) === 0 || Date.now() > end) return
+    await page.waitForTimeout(3000)
+  }
 }
 
 async function statusPage(page) {
@@ -168,22 +177,25 @@ async function editorAndAdminShots() {
 
   const german = await waitForPost(editor, 'tag:hash-lang-de-ch')
   await editor.goto(`${B}/ghost/#/posts`)
-  await editor.getByText(GERMAN_TITLE).first().waitFor()
+  // The German title as Supertext translated it (CI: the live API; without a key: the stand-in).
+  await editor.getByText(german.title, { exact: true }).first().waitFor()
   await quiet(editor)
   await editor.waitForTimeout(800)
   await shot(editor, 'posts-list', { height: 300, width: 1060, x: 330, y: 0 })
 
-  await statusPage(editor)
+  await settledStatusPage(editor)
   await shot(editor, 'status-created', pad(await box(editor.locator('#jobs')), 0))
 
   await editor.goto(`${B}/ghost/#/editor/post/${german.id}`)
-  await editor.getByText('So funktioniert es').filter({ visible: true }).first().waitFor()
+  // The first heading of the translated body (whatever Supertext made of "How it works").
+  const heading = editor.locator('[data-lexical-editor] :is(h2, h3)').filter({ visible: true }).first()
+  await heading.waitFor()
   await quiet(editor)
   await editor.waitForTimeout(1000)
   await shot(editor, 'translated-de', { height: 700, width: 820, x: 290, y: 120 })
 
   // An editor polishes the German draft, then someone requests the translation again.
-  await editor.getByText('So funktioniert es').filter({ visible: true }).first().click()
+  await heading.click()
   await editor.keyboard.press('End')
   await editor.keyboard.type(' in drei Schritten')
   await editor.waitForTimeout(4000) // drafts autosave
@@ -191,7 +203,7 @@ async function editorAndAdminShots() {
   await setRequestTag(editor, '#translate-de-ch', false)
   await setRequestTag(editor, '#translate-de-ch', true)
   await editor.waitForTimeout(4000)
-  await statusPage(editor)
+  await settledStatusPage(editor)
   await shot(editor, 'status-kept', pad(await box(editor.locator('#jobs')), 0))
 
   // --- Installation guide (admin account) -------------------------------------------------

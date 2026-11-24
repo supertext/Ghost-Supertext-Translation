@@ -168,6 +168,12 @@ export class GhostAdmin {
     return data.tags[0]!
   }
 
+  /** The installed themes (name, `package.json` version, whether active), for "Send configuration to Supertext". */
+  async themes(): Promise<Array<{ name?: string; active?: boolean; package?: { name?: string; version?: string } | null }>> {
+    const data = await this.request<{ themes?: Array<{ name?: string; active?: boolean; package?: { name?: string; version?: string } | null }> }>('GET', 'themes/')
+    return data.themes ?? []
+  }
+
   /** Cheap authenticated call to check the key. */
   async site(): Promise<{ title?: string; version?: string; url?: string }> {
     const data = await this.request<{ site: { title?: string; version?: string; url?: string } }>('GET', 'site/')
