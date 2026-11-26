@@ -18,6 +18,9 @@ export const isObject = (v: unknown): v is LexicalNode => typeof v === 'object' 
 /** Ghost writes `extended-text`; plain Lexical uses `text`. */
 export const isTextNode = (n: LexicalNode) => (n.type === 'text' || n.type === 'extended-text') && typeof n.text === 'string'
 
+/** Lexical's format bit for inline code. */
+const CODE = 16
+
 // Lexical text format bits → the tag that shows the translator what the run is.
 const FORMAT_TAGS: Array<[number, string]> = [
   [1, 'b'],
@@ -90,7 +93,10 @@ function rebuild(parent: HTMLElement, nodes: LexicalNode[], used: Set<number>, t
     }
     used.add(n)
     const copy = structuredClone(orig)
-    if (isTextNode(orig)) {
+    if (isTextNode(orig) && Number(orig.format) & CODE) {
+      // Inline code stays as it is, even if the translation changed it (`#translate-fr-ch` became `#translate-fr-fr`).
+      out.push(copy)
+    } else if (isTextNode(orig)) {
       copy.text = el.text
       if (copy.text !== '') out.push(copy)
     } else if (Array.isArray(orig.children)) {

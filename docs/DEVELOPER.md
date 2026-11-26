@@ -70,7 +70,7 @@ One `<div data-st-id="N">` per segment (div, because card HTML such as toggle co
 <div data-st-id="4">Hello <b data-n="0">bold world</b> and <a data-n="1" href="https://supertext.com">a link</a>.<br data-n="2">Line two.</div>
 ```
 
-Text formats become `b`, `i`, `u`, `s`, `code`, `sub`, `sup`, `mark`; links `a href`. Nothing is marked `translate="no"`: the live API then leaves stray «» quotes next to the element, while plain `<code>` already comes back untranslated (checked October 2026). `data-n` points to the original Lexical node, which is cloned when rebuilding, so formatting follows the words when the translator reorders them. Tags the translator invents or duplicates are dropped (their text kept). This follows the project rule: never one `data-st-id` per formatted run.
+Text formats become `b`, `i`, `u`, `s`, `code`, `sub`, `sup`, `mark`; links `a href`. Nothing is marked `translate="no"`: the live API then leaves stray «» quotes next to the element, while plain `<code>` usually comes back untranslated. Inline code is written back from the source anyway: in November 2026 the live API turned `#translate-fr-ch` into `#translate-fr-fr` in a French (Switzerland) translation. `data-n` points to the original Lexical node, which is cloned when rebuilding, so formatting follows the words when the translator reorders them. Tags the translator invents or duplicates are dropped (their text kept). This follows the project rule: never one `data-st-id` per formatted run.
 
 ### Translation files (`src/files.ts`)
 

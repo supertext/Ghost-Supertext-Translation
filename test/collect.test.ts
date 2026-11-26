@@ -106,6 +106,19 @@ describe('collect', () => {
     expect(p.children[2]).toMatchObject({ format: 1, text: 'fette Welt' })
   })
 
+  it('keeps inline code as it is, even when the translation changed it', () => {
+    const c = collect(post())
+    const html = buildHtml(c.segments)
+    const id = Number(/<div data-st-id="(\d+)">One <code/.exec(html)![1])
+    const translated = parseHtml(html)
+    translated.set(id, translated.get(id)!.replace('One ', 'Eins ').replace('>x</code>', '>y</code>'))
+    applyTranslations(c.segments, translated)
+    const all = JSON.stringify(c.lexical)
+    expect(all).toContain('"text":"x"')
+    expect(all).not.toContain('"text":"y"')
+    expect(all).toContain('Eins ')
+  })
+
   it('keeps the source text for segments the response lost', () => {
     const c = collect(post())
     const translated = parseHtml(shout(buildHtml(c.segments)))

@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+
+- Inline code (text formatted as code) always keeps its source text, as the user guide says; the AI sometimes changed it (a `#translate-fr-ch` became `#translate-fr-fr`).
+
 ## [1.1.0] - 2026-11-26
 
 ### Added
